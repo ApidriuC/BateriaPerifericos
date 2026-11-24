@@ -53,7 +53,8 @@ public sealed class ScyroxProvider : IBatteryProvider
             int mv = (r[8] << 8) | r[9];
             // Igual que la app oficial: % a partir del voltaje con su tabla. Con el cable conectado el
             // firmware reporta un valor fijo (95) y el voltaje sube por la corriente de carga, así que
-            // se descuenta ese aumento antes de usar la tabla (medido contra la app: 3934 mV → 51 %).
+            // se descuenta ese aumento antes de usar la tabla (calibrado contra la app: ~3895 mV → 46 %,
+            // ~3932 mV → 51 %, ~3970 mV → 59 %).
             // El firmware en 100 indica carga completa.
             int pct = mv == 0 ? firmwarePct
                 : usb ? (firmwarePct >= 100 ? 100 : PercentFromMillivolts(mv - ChargingOffsetMv))
@@ -82,7 +83,7 @@ public sealed class ScyroxProvider : IBatteryProvider
     };
 
     /// <summary>Aumento aproximado del voltaje mientras carga (deducido comparando con la app oficial).</summary>
-    internal const int ChargingOffsetMv = 45;
+    internal const int ChargingOffsetMv = 35;
 
     internal static int PercentFromMillivolts(int mv)
     {
