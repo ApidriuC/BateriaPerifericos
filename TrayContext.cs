@@ -110,7 +110,7 @@ public sealed class TrayContext : ApplicationContext
     private static readonly string StateFile = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BateriaPerifericos", "ultima-lectura.json");
 
-    private sealed record Saved(int Percent, DateTime At);
+    private sealed record Saved(int Percent, DateTime At, bool Charging = false);
 
     private void LoadLastReadings()
     {
@@ -121,10 +121,9 @@ public sealed class TrayContext : ApplicationContext
             foreach (var s in _slots)
                 if (data != null && data.TryGetValue(s.Provider.Name, out var v))
                 {
-                    s.LastGood = new BatteryReading(DeviceState.Ok, v.Percent);
+                    s.LastGood = new BatteryReading(DeviceState.Ok, v.Percent, v.Charging);
                     s.LastGoodAt = v.At;
-                    s.Stale = true;
-                }
+                    s.Stale = true;                }
         }
         catch (FileNotFoundException) { /* primera ejecución */ }
         catch (Exception ex) { Activity.Log("no se pudo cargar la última lectura: " + ex.Message); }
@@ -135,7 +134,7 @@ public sealed class TrayContext : ApplicationContext
         try
         {
             var data = _slots.Where(s => s.LastGood != null)
-                .ToDictionary(s => s.Provider.Name, s => new Saved(s.LastGood!.Percent, s.LastGoodAt));
+                .ToDictionary(s => s.Provider.Name, s => new Saved(s.LastGood!.Percent, s.LastGoodAt, s.LastGood.Charging));
             Directory.CreateDirectory(Path.GetDirectoryName(StateFile)!);
             File.WriteAllText(StateFile, System.Text.Json.JsonSerializer.Serialize(data));
         }
@@ -151,7 +150,7 @@ public sealed class TrayContext : ApplicationContext
             if (s.LastGood is not { } lg) return new WidgetItem(kind, "--", IconRenderer.Gray);
             var color = IconRenderer.LevelColor(lg.Percent);
             if (s.Stale) color = Color.FromArgb((color.R + 2 * 150) / 3, (color.G + 2 * 150) / 3, (color.B + 2 * 150) / 3);
-            return new WidgetItem(kind, $"{lg.Percent}%", color);
+            return new WidgetItem(kind, $"{lg.Percent}%", color, Charging: lg.Charging && !s.Stale);
         }).ToList();
         _widget.SetItems(items);
     }
@@ -159,6 +158,11 @@ public sealed class TrayContext : ApplicationContext
     private void Apply(Slot slot, BatteryReading r)
     {
         string name = slot.Provider.Name;
+
+        // Mientras carga, el voltaje oscila un poco: el % solo sube, nunca baja.
+        if (r.State == DeviceState.Ok && r.Charging && slot.LastGood is { Charging: true } prev && r.Percent < prev.Percent)
+            r = r with { Percent = prev.Percent };
+
         if (r.State == DeviceState.Ok) { slot.LastGood = r; slot.LastGoodAt = DateTime.Now; }
         if (r.State == DeviceState.NotConnected) slot.LastGood = null;
         slot.Stale = r.State != DeviceState.Ok;

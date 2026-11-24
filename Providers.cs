@@ -51,9 +51,13 @@ public sealed class ScyroxProvider : IBatteryProvider
             if (firmwarePct > 100) continue;
             bool usb = r[7] != 0;
             int mv = (r[8] << 8) | r[9];
-            // Igual que la app oficial: % a partir del voltaje. Con el cable conectado el voltaje
-            // sube por la carga y no sirve, así que ahí se usa el % (en pasos de 5) del firmware.
-            int pct = usb || mv == 0 ? firmwarePct : PercentFromMillivolts(mv);
+            // Igual que la app oficial: % a partir del voltaje con su tabla. Con el cable conectado el
+            // firmware reporta un valor fijo (95) y el voltaje sube por la corriente de carga, así que
+            // se descuenta ese aumento antes de usar la tabla (medido contra la app: 3934 mV → 51 %).
+            // El firmware en 100 indica carga completa.
+            int pct = mv == 0 ? firmwarePct
+                : usb ? (firmwarePct >= 100 ? 100 : PercentFromMillivolts(mv - ChargingOffsetMv))
+                : PercentFromMillivolts(mv);
             return new(DeviceState.Ok, pct, usb && pct < 100, $"{mv / 1000.0:0.00} V");
         }
         // El dongle está conectado pero el mouse no contesta: apagado o dormido.
@@ -76,6 +80,9 @@ public sealed class ScyroxProvider : IBatteryProvider
         3050, 3420, 3480, 3540, 3600, 3660, 3720, 3760, 3800, 3840, 3880,
         3920, 3940, 3960, 3980, 4000, 4020, 4040, 4060, 4080, 4110,
     };
+
+    /// <summary>Aumento aproximado del voltaje mientras carga (deducido comparando con la app oficial).</summary>
+    internal const int ChargingOffsetMv = 45;
 
     internal static int PercentFromMillivolts(int mv)
     {

@@ -7,7 +7,7 @@ using Microsoft.Win32;
 namespace BateriaPerifericos;
 
 /// <summary>Lo que se pinta de un dispositivo en la barra.</summary>
-public sealed record WidgetItem(DeviceKind Kind, string Text, Color Color);
+public sealed record WidgetItem(DeviceKind Kind, string Text, Color Color, bool Charging = false);
 
 /// <summary>
 /// Panel transparente incrustado en la barra de tareas (hijo de Shell_TrayWnd), justo a la
@@ -16,7 +16,7 @@ public sealed record WidgetItem(DeviceKind Kind, string Text, Color Color);
 /// </summary>
 public sealed class TaskbarWidget : NativeWindow, IDisposable
 {
-    private const string GlyphMouse = "", GlyphHeadset = "";
+    private const string GlyphMouse = "", GlyphHeadset = "", Bolt = "";
     private const int Gap = 12, Margin = 6;
 
     private readonly ContextMenuStrip _menu;
@@ -99,6 +99,7 @@ public sealed class TaskbarWidget : NativeWindow, IDisposable
 
         using var glyphFont = new Font("Segoe Fluent Icons", 16 * scale, GraphicsUnit.Pixel);
         using var textFont = new Font("Segoe UI", 12 * scale, GraphicsUnit.Pixel);
+        using var boltFont = new Font("Segoe Fluent Icons", 12 * scale, GraphicsUnit.Pixel);
         using var measureBmp = new Bitmap(1, 1);
         using var mg = Graphics.FromImage(measureBmp);
         var fmt = StringFormat.GenericTypographic;
@@ -109,6 +110,7 @@ public sealed class TaskbarWidget : NativeWindow, IDisposable
         {
             float gw = mg.MeasureString(Glyph(it.Kind), glyphFont, 1000, fmt).Width;
             float tw = mg.MeasureString(it.Text, textFont, 1000, fmt).Width;
+            if (it.Charging) tw += 2 * scale + mg.MeasureString(Bolt, boltFont, 1000, fmt).Width;
             layout.Add((it, gw, tw));
             total += gw + 5 * scale + tw + Gap * scale;
         }
@@ -136,6 +138,12 @@ public sealed class TaskbarWidget : NativeWindow, IDisposable
             g.DrawString(Glyph(it.Kind), glyphFont, brush, x, (height - gh) / 2f + 1 * scale, fmt);
             x += gw + 5 * scale;
             g.DrawString(it.Text, textFont, brush, x, (height - th) / 2f, fmt);
+            if (it.Charging)
+            {
+                // Rayo de "cargando" justo después del porcentaje.
+                float textOnly = g.MeasureString(it.Text, textFont, 1000, fmt).Width;
+                g.DrawString(Bolt, boltFont, brush, x + textOnly + 2 * scale, (height - boltFont.Height) / 2f + 1 * scale, fmt);
+            }
             x += tw + Gap * scale;
         }
         return bmp;
