@@ -150,7 +150,7 @@ public sealed class TrayContext : ApplicationContext
             if (s.LastGood is not { } lg) return new WidgetItem(kind, "--", IconRenderer.Gray);
             var color = IconRenderer.LevelColor(lg.Percent);
             if (s.Stale) color = Color.FromArgb((color.R + 2 * 150) / 3, (color.G + 2 * 150) / 3, (color.B + 2 * 150) / 3);
-            return new WidgetItem(kind, $"{lg.Percent}%", color, Charging: lg.Charging && !s.Stale);
+            return new WidgetItem(kind, $"{lg.Percent}%", color, Charging: lg.Charging); // si se duerme conectado, sigue cargando
         }).ToList();
         _widget.SetItems(items);
     }
